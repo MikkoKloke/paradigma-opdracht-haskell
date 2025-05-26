@@ -1,4 +1,4 @@
-import Text.Parsec (parserBind)
+import Text.Parsec (parserBind, tokens)
 import Data.Text(replace, pack, unpack)
 import Data.Typeable
 import Language.Haskell.TH (sourceStrict)
@@ -7,23 +7,29 @@ import qualified Data.Graph as Data
 import Text.XHtml (treeColors)
 import Distribution.Simple.Utils (lowercase)
 
-import Data.Char(isLetter)
+import Data.Char(isLetter, isDigit)
 import Data.IntMap (size)
+import qualified Text.Read.Lex as GHC.Types
 -- import Data.ByteString (hPutStr)
 -- import Data.ByteString.Char8 (hPutStrLn)
 
 
 -- TOKENS
-number = [1..9]
+number = [1..9] -- not used
 alphLwr = ['a'..'z']
 alphUpr = ['A'..'Z']
-leftBrace = "{"
-rightBrace = "}"
-quotation = "\""
-colon = ":"
-comma = ","
+leftBrace = '{'
+rightBrace = '}'
+quotation = '\"'
+colon = ':'
+comma = ','
 
-rawJsonInput = "{\n \"Person\" : {\n \"name\" : \"name of person\",\n \"height\" : 1.80,\n \"weight\" : \"light as a feather\"\n} \n\"packageNr\" :1724627 \n}"
+rawJsonInput = "{\n \"Person\" : {\n \"name\" : \"name of person\",\n \"height\" : 180,\n \"weight\" : \"light as a feather\"\n} \n\"packageNr\" :7124627 \n}"
+
+-- TODO!!!!
+-- USE A CUSTOM TYPE FOR THE LEXER TOKENSTREAM: *List of different types* :? https://stackoverflow.com/questions/7787317/list-of-different-types
+-- TOKEN = PAIR OF ENUM? AND THE VALUE, WHICH CAN BE 2 TYPES:
+-- token = (type, (string | int | something else? (Or do i make all the different kinds of tokens different types here?) ))
 
 -- Create new Tree datatype https://dkalemis.wordpress.com/2014/01/23/trees-in-haskell/
 -- Data.Tree??
@@ -31,30 +37,43 @@ data ParseTree parseTree = EmptyNode
                 | Node parseTree [ParseTree parseTree]
 
 -- lexerGetTokenStream :: String -> String -- [String] 
-lexerGetTokenStream rawJson = -- do
-     removeWhiteSpace rawJsonInput-- rawJson -- let jsonWithoutWhitespace = 
-    -- makeTokenStream jsonWithoutWhitespace []
+lexerGetTokenStream :: p -> IO ()
+lexerGetTokenStream rawJson = do
+    let jsonWithoutWhitespace = removeWhiteSpace rawJsonInput -- rawJson 
+    -- print jsonWithoutWhitespace
+    print (makeTokenStream [] jsonWithoutWhitespace)
 
 
-makeTokenStream :: [String] -> [String] -> t
+makeTokenStream :: [String] -> String -> [String]
 makeTokenStream tokenStream json
-    | nextChar == leftBrace = makeTokenStream (tokenStream ++ [leftBrace]) (drop 1 json) 
-    | nextChar == rightBrace = makeTokenStream (tokenStream ++  [rightBrace]) (drop 1 json)
-    | nextChar == quotation =   let identifiertoken = makeIdentifierToken "" (drop 1 json)
-                                in  makeTokenStream [identifiertoken] (drop (identifiertoken.length + 2) json) -- 99999 is een placeholder. Weet nog niet hoe ik de drop-amount ga krijgen uit makeIdentifiertoken
+    | json == "" = tokenStream -- when the json string is empty, give back the tokenstream
+    | nextChar == leftBrace = makeTokenStream (tokenStream ++ [[leftBrace]]) (drop 1 json)
+    | nextChar == rightBrace = makeTokenStream (tokenStream ++  [[rightBrace]]) (drop 1 json)
+    | nextChar == quotation =   let textToken = makeTextToken "" (drop 1 json) -- If you encounter a quotation, it is an identifier, drop the quotation and make the identifiertoken with the remaining stream
+                                in  makeTokenStream (tokenStream ++ [textToken]) (drop (length textToken + 2) json) -- 99999 is een placeholder. Weet nog niet hoe ik de drop-amount ga krijgen uit makeIdentifiertoken
+    | nextChar == colon = makeTokenStream (tokenStream ++ [[colon]]) (drop 1 json)
+    | isJsonNumber nextChar =   let numberToken = makeNumberToken "" json
+                                in  makeTokenStream (tokenStream ++ [numberToken]) (drop (length numberToken) json)
+    | nextChar == comma = makeTokenStream (tokenStream ++ [[comma]]) (drop 1 json)
+    -- | otherwise = tokenStream
     where nextChar = head json
 
 -- makeIdentifierToken :: String -> String
-makeIdentifierToken token json
+makeTextToken :: [Char] -> [Char] -> [Char]
+makeTextToken token json
     | nextChar == quotation = token
-    | otherwise = makeIdentifierToken (token ++ nextChar) (drop 1 json)
+    | otherwise = makeTextToken (token ++ [nextChar]) (drop 1 json)
     where nextChar = head json
 
-    -- | nextChar == alphLwr =  makeIdentifierToken ((token ++ nextChar) (drop 1 json))
+makeNumberToken :: [Char] -> [Char] -> [Char]
+makeNumberToken token json
+    | isJsonNumber nextChar || nextChar == '.' = makeNumberToken (token ++ [nextChar]) (drop 1 json) 
+    -- | nextChar == '.' = makeNumberToken (token ++ [nextChar]) (drop 1 json)
+    | otherwise = token
+    where nextChar = head json
 
-
-
-
+isJsonNumber :: Char -> Bool
+isJsonNumber character = character == '.' || isDigit character
 
 
 
@@ -124,7 +143,7 @@ makeIdentifierToken token json
 -- --             Main.cycle (drop 1 remainingJson)
 
 
-removeWhiteSpace :: String -> String
+removeWhiteSpace :: [Char] -> String
 removeWhiteSpace string = do
     let text = pack string
     unpack (replace (pack "\n") (pack "") (replace (pack " ") (pack "") text))
