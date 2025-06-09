@@ -1,19 +1,9 @@
------ LEXER -----
-
--- Tokens ---
--- number = [1..9] -- not used
--- alphLwr = ['a'..'z']
--- alphUpr = ['A'..'Z']
-import Text.Read (Lexeme(String))
-import Graphics.Win32 (restoreDC)
-import Data.String (IsString)
-import Data.Text (pack, unpack, replace)
-import Data.Char (isDigit)
+import Data.Text (pack, replace, unpack)
 import Data.List (isPrefixOf)
-import GHC.Exts.Heap (GenClosure(value, key))
-import Control.Exception (throw)
-import System.Win32.DebugApi (DebugEventInfo(Exception))
+import Data.Char (isDigit)
+import Distribution.PackageDescription (mapTreeConds)-- import Data.ByteString.Char8 (putStrLn)
 
+----- Lexer Tokens -----
 leftBrace = '{'
 rightBrace = '}'
 leftBracket = '['
@@ -22,9 +12,8 @@ quotation = '\"'
 colon = ':'
 comma = ','
 
-rawJsonInput = "{\n \"Destination\" : \"Japan\", \n \"Person\" : {\n \"name\" : true,\n \"height\" : 150,\n \"weight\" : \"light as a feather\"\n} , \n\"packageNr\" :7124627 \n}"
 
---- Token Stream ---
+--- Lexer Token Stream ---
 data LexerToken = LeftBraceToken
                 | RightBraceToken
                 | LeftBracketToken
@@ -49,13 +38,31 @@ data ParseTree =  JsonObjectNode [(String, ParseTree)]
                 deriving Show
 
 
+rawJsonInput1 = "{\n \"destination\" : \"Japan\", \n \"Person\" : {\n \t\"name\" : true,\n \t\"height\" : 150,\n \t\"weight\" : \"light as a feather\"\n\t} , \n\"packageNr\" :7124627 \n}"
+rawJsonInput2 = "{\n\t\"naam\" : \"Marit\",\n\t\"hobbies\" : [\"Tekenen\", \"RDR2\", \"Murder Mystery\"],\n\t\"werk\" : {\n\t\t\"naam\" : \"Starbucks\",\n\t\t\"functie\" : \"Barista\",\n\t\t\"locatie\" : {\n\t\t\t\"naam\" : \"Nijmegen Centraal Station\",\n\t\t\t\"Adres\" : \"6512 AB Nijmegen\",\n\t\t\t\"breedteGraad\" : 51.843742,\n\t\t\t\"lengteGraad\" : 5.8537626,\n\t\t\t\"toegankelijk mindervaliden\" : true\n\t\t}\n\t},\n\t\"lengte\" : 1.60\n}"
+
+-- testPureFunctions = do
+--     -- first print a variable
+--     printJson
+
+--     -- then set its value to something else. Note: you cannot use the assignment operator without the let, so we are essentially initialising the same variable locally.
+--     let rawJsonInput = "iets anders"
+--     -- print the new value
+--     print rawJsonInput
+
+--     -- but when the same variable is printed outside of the function, the value is the old one.
+--     printJson
+
+-- printJson = print rawJsonInput
 
 ----- Main Function -----
-parseJsonIntoParseTree :: String -> IO ()
-parseJsonIntoParseTree rawJson = do
+parseJson :: String -> IO ()
+parseJson rawJson = do
     putStrLn " ----- RAWJSON ----- "
     putStrLn rawJson
     putStrLn ""
+
+    let rawJsonInput = 123
 
     let jsonWithoutWhitespace = removeWhiteSpace rawJson
     putStrLn " ----- JSONWITHOUTWHITESPACE ----- "
@@ -67,6 +74,7 @@ parseJsonIntoParseTree rawJson = do
     print tokenStream
     putStrLn ""
 
+    -- let parseTree = fst (parseNextToken tokenStream)
     let parseTree = parseTokenStream tokenStream
     putStrLn " ----- PARSETREE ----- "
     print parseTree
@@ -75,8 +83,7 @@ parseJsonIntoParseTree rawJson = do
 removeWhiteSpace :: [Char] -> String
 removeWhiteSpace string = do
     let text = pack string
-    unpack (replace (pack "\n") (pack "") (replace (pack " ") (pack "") text))
-
+    unpack (replace (pack "\n") (pack "") (replace (pack "\t") (pack "") (replace (pack " ") (pack "") text)))
 
 
 ----- Lexer Functions -----
@@ -123,12 +130,14 @@ lexerIsJsonNumber character = character == '.' || isDigit character
 
 
 ----- Parser Functions -----
-parseTokenStream :: TokenStream  -> ParseTree
-parseTokenStream tokenStream = JsonObjectNode [("Root Node Json Object", parseTree)]
+parseTokenStream :: TokenStream -> ParseTree
+parseTokenStream tokenStream = parseTree
+                                        -- GOES TO PARSENEXTTOKEN TO PARSE THE ROOT JSON OBJECT
     where (parseTree, remainingTokens) = parseNextToken tokenStream
 
 parseNextToken :: TokenStream -> (ParseTree, TokenStream)
 parseNextToken [] = (TextNode "null", [])
+-- ENTERS HERE FOR THE FIRST TIME FOR THE ROOT JSON OBJECT - LATER COMES BACK TO THIS FUNCTION FOR THE REST OF THE IDENTIFIERS OF THE ROOT OBJECT, WHICH ARE THE BASE JSON VALUES, AND ENTERS THIS LINE ONLY WHEN ENCOUNTERING A SUB-OBJECT.
 parseNextToken (LeftBraceToken:rest) = parseObject [] rest
 parseNextToken (LeftBracketToken:rest) = parseArray [] rest
 parseNextToken (TextToken text:rest) = (TextNode text, rest)
@@ -143,12 +152,12 @@ parseObject :: [(String, ParseTree)] -> TokenStream -> (ParseTree, TokenStream)
 parseObject identifiers (RightBraceToken:remainderOfStream) = (JsonObjectNode identifiers, remainderOfStream)
 -- If the next token is a TextToken, followed by a ColonToken, it is an identifier.
 parseObject identifiers (TextToken identifierKey:ColonToken:rest) = let (identifierValue, remainingObject) = parseNextToken rest
-                                                                                            -- SUB-BASE CASE: If there is not a CommaToken after the identifier, there *should* be a RightBraceToken
+                                                                                            -- SUB-BASE CASE: If there is a rightbracetoken after the identifier, the object closes
                                                                     in case remainingObject of RightBraceToken:restOfTokenStream -> (JsonObjectNode (identifiers ++ [(identifierKey , identifierValue)]), restOfTokenStream)
                                                                                             -- If there is a CommaToken after the identifier, add the currect identifier to the object and parse the next identifier its remaining tokens.
-                                                                                               CommaToken:restOfObject -> parseObject [(identifierKey, identifierValue)] restOfObject
+                                                                                               CommaToken:restOfObject -> parseObject (identifiers ++ [(identifierKey, identifierValue)]) restOfObject
                                                                                                incorrectNextToken -> error ("Syntax Error: Expected ',' or '}' after object-identifier with key: " ++ identifierKey)
-parseObject identifiers tokens = error ("Syntax Error: Unexpected tokens in object. \\n Remainder of tokenstream: " ++ show tokens)
+parseObject identifiers tokens = error ("Syntax Error: Unexpected tokens in object. \n Remainder of tokenstream: " ++ show tokens)
 
 
 parseArray :: [ParseTree] -> TokenStream -> (ParseTree, TokenStream)
@@ -158,8 +167,3 @@ parseArray array tokens = let (arrayElementValue, remainingArray) = parseNextTok
                           in case remainingArray of RightBracketToken:restOfTokenStream -> (ArrayNode (array ++ [arrayElementValue]), restOfTokenStream)
                                                     CommaToken:restOfArray -> parseArray (array ++ [arrayElementValue]) restOfArray
                                                     incorrectNextToken -> error "Syntax Error: Expected ',' or ']' in an array"
--- parseArray array (nextElement:CommaToken:moreArray) = let (arrayElementValue, remainingArray) = parseNextToken moreArray
---                                                       in case remainingArray of RightBracketToken:restOfTokenStream -> (ArrayNode (array ++ [arrayElementValue]), restOfTokenStream)
---                                                                                 CommaToken:restOfArray -> parseArray (array ++ [arrayElementValue]) restOfArray
---                                                                                 incorrectNextToken -> error "Syntax Error: Expected ',' or ']' in an array"
--- parseArray array incorrectElement
