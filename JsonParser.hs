@@ -28,7 +28,7 @@ data LexerToken = LeftBraceToken
 type TokenStream = [LexerToken]
 
 
------ Parser Tree -----
+--- Parser Tree ---
 data ParseTree =  JsonObjectNode [(String, ParseTree)]
                 | TextNode String
                 | NumberNode String
@@ -39,7 +39,7 @@ data ParseTree =  JsonObjectNode [(String, ParseTree)]
 
 
 rawJsonInput1 = "{\n \"destination\" : \"Japan\", \n \"Person\" : {\n \t\"name\" : null,\n \t\"height\" : 150,\n \t\"weight\" : \"light as a feather\"\n\t} , \n\"packageNr\" :7124627 \n}"
-rawJsonInput2 = "{\n\t\"naam\" : \"Marit\",\n\t\"hobbies\" : [\"Tekenen\", \"RDR2\", \"Murder Mystery\"],\n\t\"werk\" : {\n\t\t\"bedrijf\" : \"Starbucks\",\n\t\t\"functie\" : \"Barista\",\n\t\t\"locatie\" : {\n\t\t\t\"naam\" : \"Nijmegen Centraal Station\",\n\t\t\t\"Adres\" : \"6512 AB Nijmegen\",\n\t\t\t\"breedteGraad\" : 51.843742,\n\t\t\t\"lengteGraad\" : 5.8537626,\n\t\t\t\"toegankelijk mindervaliden\" : true, \n\t\t\t\"Lekkere Koffie?\" : null \n\t\t}\n\t},\n\t\"lengte\" : 1.60\n}"
+rawJsonInput2 = "{\n\t\"naam\" : \"Marit\",\n\t\"hobbies\" : [\"Tekenen\", \"RDR2\", \"Murder Mystery\"],\n\t\"werk\" : {\n\t\t\"bedrijf\" : \"Starbucks\",\n\t\t\"functie\" : \"Barista\",\n\t\t\"locatie\" : {\n\t\t\t\"naam\" : \"Nijmegen Centraal Station\",\n\t\t\t\"Adres\" : \"6512 AB Nijmegen\",\n\t\t\t\"breedtegraad\" : 51.843742,\n\t\t\t\"lengtegraad\" : 5.8537626,\n\t\t\t\"toegankelijk mindervaliden\" : true, \n\t\t\t\"Lekkere Koffie?\" : null \n\t\t}\n\t},\n\t\"lengte\" : 1.60\n}"
 
 ----- Main Function -----
 parseJson :: String -> IO ()
@@ -92,7 +92,7 @@ lexerMakeTokenStream tokenStream json
                                        in  lexerMakeTokenStream (tokenStream ++ [NumberToken numberToken]) (drop (length numberToken) json)
     | "true" `isPrefixOf` json  = lexerMakeTokenStream (tokenStream ++ [BooleanToken True]) (drop 4 json)
     | "false" `isPrefixOf` json = lexerMakeTokenStream (tokenStream ++ [BooleanToken False]) (drop 5 json)
-    | "null" `isPrefixOf` json = lexerMakeTokenStream (tokenStream ++ [NullToken]) (drop 4 json)
+    | "null" `isPrefixOf` json  = lexerMakeTokenStream (tokenStream ++ [NullToken]) (drop 4 json)
     | otherwise                 = error ("Invalid json, on character: " ++ [nextChar] ++ "\n rest of json input: " ++ json)
     where nextChar = head json
 
@@ -105,7 +105,7 @@ lexerMakeTextToken token json
 
 lexerMakeNumberToken :: [Char] -> [Char] -> [Char]
 lexerMakeNumberToken token json
-    | lexerIsJsonNumber nextChar || nextChar == '.' = lexerMakeNumberToken (token ++ [nextChar]) (tail json)
+    | lexerIsJsonNumber nextChar = lexerMakeNumberToken (token ++ [nextChar]) (tail json)
     | otherwise = token
     where nextChar = head json
 
