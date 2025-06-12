@@ -116,7 +116,7 @@ lexerIsJsonNumber character = character == '.' || isDigit character
 
 ----- Parser Functions -----
 parseNextToken :: TokenStream -> (ParseTree, TokenStream)
-parseNextToken [] = (TextNode "null", [])
+parseNextToken [] = (TextNode "No tokens to parse.", [])
 parseNextToken (LeftBraceToken:rest)        = parseObject [] rest
 parseNextToken (LeftBracketToken:rest)      = parseArray [] rest
 parseNextToken (TextToken text:rest)        = (TextNode text, rest)
