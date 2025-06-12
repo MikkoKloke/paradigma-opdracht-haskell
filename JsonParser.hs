@@ -143,9 +143,9 @@ parseObject identifiers tokens = error ("Syntax Error: Unexpected tokens in obje
 parseArray :: [ParseTree] -> TokenStream -> (ParseTree, TokenStream)
 -- BASE CASE: If the next token is a RightBracketToken, the array ends here and needs to be returned, together with the remaining token stream.
 parseArray array (RightBracketToken:remainderOfStream) = (ArrayNode array, remainderOfStream)
-parseArray array tokens = let (arrayElementValue, remainingArray) = parseNextToken tokens
-                                                    -- SUB-BASE CASE: If there is a RightBracketToken after the element, the array closes.
-                          in case remainingArray of RightBracketToken:restOfTokenStream -> (ArrayNode (array ++ [arrayElementValue]), restOfTokenStream)
-                                                    -- If there is a CommaToken after the element, add the currect element to the array and parse the next element with the remaining tokens.
-                                                    CommaToken:restOfArray              -> parseArray (array ++ [arrayElementValue]) restOfArray
-                                                    incorrectNextToken                  -> error "Syntax Error: Expected ',' or ']' in an array"
+parseArray array tokenStream = let (arrayElementValue, remainingArray) = parseNextToken tokenStream
+                                                         -- SUB-BASE CASE: If there is a RightBracketToken after the element, the array closes.
+                               in case remainingArray of RightBracketToken:restOfTokenStream -> (ArrayNode (array ++ [arrayElementValue]), restOfTokenStream)
+                                                         -- If there is a CommaToken after the element, add the currect element to the array and parse the next element with the remaining tokens.
+                                                         CommaToken:restOfArray              -> parseArray (array ++ [arrayElementValue]) restOfArray
+                                                         incorrectNextToken                  -> error "Syntax Error: Expected ',' or ']' in an array"
