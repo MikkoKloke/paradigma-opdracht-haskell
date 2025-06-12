@@ -53,12 +53,12 @@ parseJson rawJson = do
     putStrLn jsonWithoutWhitespace
     putStrLn ""
 
-    let tokenStream = lexerGetTokenStream jsonWithoutWhitespace
+    let tokenStream = lexerMakeTokenStream [] jsonWithoutWhitespace
     putStrLn " ----- TOKENSTREAM ----- "
     print tokenStream
     putStrLn ""
 
-    let parseTree = parseTokenStream tokenStream
+    let parseTree = fst (parseNextToken tokenStream)
     putStrLn " ----- PARSETREE ----- "
     print parseTree
     putStrLn ""
@@ -70,9 +70,6 @@ removeWhiteSpace string = do
 
 
 ----- Lexer Functions -----
-lexerGetTokenStream :: String -> TokenStream
-lexerGetTokenStream json = lexerMakeTokenStream [] json
-
 lexerMakeTokenStream :: TokenStream -> String -> TokenStream
 lexerMakeTokenStream tokenStream json
     -- Base case for the recursion, if all the json is tokenified give back the tokenStream.
@@ -86,7 +83,8 @@ lexerMakeTokenStream tokenStream json
     | nextChar == comma         = lexerMakeTokenStream (tokenStream ++ [CommaToken]) (tail json)
     -- If you encounter a quotation, it is an identifier or text value, drop the quotation and make the identifiertoken with the remaining stream
     | nextChar == quotation     = let textToken = lexerMakeTextToken "" (tail json)
-                                  in  lexerMakeTokenStream (tokenStream ++ [TextToken textToken]) (drop (length textToken + 2) json) -- Add 2 to the drop amount, to account for the two quotations that need to be removed. 
+                                                            -- Add 2 to the drop amount, to account for the two quotations that need to be removed.
+                                  in  lexerMakeTokenStream (tokenStream ++ [TextToken textToken]) (drop (length textToken + 2) json) 
     -- If you encounter a number, it is a number value.
     | lexerIsJsonNumber nextChar     = let numberToken = lexerMakeNumberToken "" json
                                        in  lexerMakeTokenStream (tokenStream ++ [NumberToken numberToken]) (drop (length numberToken) json)
@@ -98,12 +96,15 @@ lexerMakeTokenStream tokenStream json
 
 ----- Lexer Helper Functions -----
 lexerMakeTextToken :: [Char] -> [Char] -> [Char]
+lexerMakeTextToken token [] = error "Syntax Error: Json not closed properly"
 lexerMakeTextToken token json
     | nextChar == quotation = token
     | otherwise = lexerMakeTextToken (token ++ [nextChar]) (tail json)
-    where nextChar = head json
+    where
+        nextChar = head json
 
 lexerMakeNumberToken :: [Char] -> [Char] -> [Char]
+lexerMakeNumberToken token [] = error "Syntax Error: Json not closed properly"
 lexerMakeNumberToken token json
     | lexerIsJsonNumber nextChar = lexerMakeNumberToken (token ++ [nextChar]) (tail json)
     | otherwise = token
@@ -114,10 +115,6 @@ lexerIsJsonNumber character = character == '.' || isDigit character
 
 
 ----- Parser Functions -----
-parseTokenStream :: TokenStream -> ParseTree
-parseTokenStream tokenStream = parseTree
-    where (parseTree, remainingTokens) = parseNextToken tokenStream
-
 parseNextToken :: TokenStream -> (ParseTree, TokenStream)
 parseNextToken [] = (TextNode "null", [])
 parseNextToken (LeftBraceToken:rest)        = parseObject [] rest
