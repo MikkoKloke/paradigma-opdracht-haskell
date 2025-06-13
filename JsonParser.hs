@@ -1,18 +1,20 @@
-import Data.Text (pack, replace, unpack)
 import Data.List (isPrefixOf)
 import Data.Char (isDigit, isSpace)
 
------ Lexer Tokens -----
+----- Lexer -----
 leftBrace = '{'
 rightBrace = '}'
 leftBracket = '['
 rightBracket = ']'
 quotation = '\"'
+escapedQuotation = "\\\""
 colon = ':'
 comma = ','
 
 
 --- Lexer Token Stream ---
+type TokenStream = [LexerToken]
+
 data LexerToken = LeftBraceToken
                 | RightBraceToken
                 | LeftBracketToken
@@ -25,8 +27,6 @@ data LexerToken = LeftBraceToken
                 | NullToken
                 deriving (Show)
 
-type TokenStream = [LexerToken]
-
 
 --- Parser Tree ---
 data ParseTree =  JsonObjectNode [(String, ParseTree)]
@@ -37,13 +37,11 @@ data ParseTree =  JsonObjectNode [(String, ParseTree)]
                 | NullNode
                 deriving Show
 
-
-rawJsonInput1 = "{\n \"destination\" : \"Japan\", \n \"Person\" : {\n \t\"name\" : null,\n \t\"height\" : 150,\n \t\"weight\" : \"light as a feather\"\n\t} , \n\"packageNr\" :7124627 \n}"
-rawJsonInput2 = "{\n\t\"naam\" : \"Marit\",\n\t\"hobbies\" : [\"Tekenen\", \"RDR2\", \"Murder Mystery\"],\n\t\"werk\" : {\n\t\t\"bedrijf\" : \"Starbucks\",\n\t\t\"functie\" : \"Barista\",\n\t\t\"locatie\" : {\n\t\t\t\"naam\" : \"Nijmegen Centraal Station\",\n\t\t\t\"Adres\" : \"6512 AB Nijmegen\",\n\t\t\t\"breedtegraad\" : 51.843742,\n\t\t\t\"lengtegraad\" : 5.8537626,\n\t\t\t\"toegankelijk mindervaliden\" : true, \n\t\t\t\"Lekkere Koffie?\" : null \n\t\t}\n\t},\n\t\"lengte\" : 1.60\n}"
-
 ----- Main Function -----
 parseJson :: String -> IO ()
-parseJson rawJson = do
+parseJson jsonFileName = do
+    rawJson <- readFile jsonFileName -- "rawJsonInput.json"
+
     putStrLn " ----- RAWJSON ----- "
     putStrLn rawJson
     putStrLn ""
@@ -64,6 +62,7 @@ lexerMakeTokenStream :: TokenStream -> String -> TokenStream
 lexerMakeTokenStream tokenStream json
     -- Base case for the recursion, if all the json is tokenified give back the tokenStream.
     | null json                 = tokenStream
+    -- Ignore whitespace
     | isSpace nextChar          = lexerMakeTokenStream tokenStream (tail json)
     -- Simple 1 character tokens.
     | nextChar == leftBrace     = lexerMakeTokenStream (tokenStream ++ [LeftBraceToken]) (tail json)
@@ -88,6 +87,7 @@ lexerMakeTokenStream tokenStream json
 ----- Lexer Helper Functions -----
 lexerMakeTextToken :: [Char] -> [Char] -> [Char]
 lexerMakeTextToken token [] = error "Syntax Error: Json not closed properly"
+lexerMakeTextToken token ('\\':'\"':restOfJson) = lexerMakeTextToken (token ++ escapedQuotation) restOfJson
 lexerMakeTextToken token json
     | nextChar == quotation = token
     | otherwise = lexerMakeTextToken (token ++ [nextChar]) (tail json)
@@ -139,3 +139,6 @@ parseArray array tokenStream = let (arrayElementValue, remainingArray) = parseNe
                                                          -- If there is a CommaToken after the element, add the currect element to the array and parse the next element with the remaining tokens.
                                                          CommaToken:restOfArray              -> parseArray (array ++ [arrayElementValue]) restOfArray
                                                          incorrectNextToken                  -> error "Syntax Error: Expected ',' or ']' in an array"
+
+
+

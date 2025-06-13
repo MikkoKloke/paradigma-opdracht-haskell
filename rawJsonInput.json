@@ -1,0 +1,16 @@
+{
+    "naam" : "Marit",
+    "hobbies" : ["Tekenen", "RDR2", "Murder Mystery"],
+    "werk" : {
+        "naam" : "Starbucks",
+        "functie" : "Barista",
+        "locatie" : {
+            "naam" : "Nijmegen \" Centraal Station",
+            "Adres" : "6512 AB Nijmegen",
+            "breedteGraad" : 51.843742,
+            "lengteGraad" : 5.8537626,
+            "toegankelijk mindervaliden" : null
+        }
+    },
+    "lengte" : 1.60
+}
