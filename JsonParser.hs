@@ -1,6 +1,6 @@
 import Data.Text (pack, replace, unpack)
 import Data.List (isPrefixOf)
-import Data.Char (isDigit)
+import Data.Char (isDigit, isSpace)
 
 ----- Lexer Tokens -----
 leftBrace = '{'
@@ -48,12 +48,7 @@ parseJson rawJson = do
     putStrLn rawJson
     putStrLn ""
 
-    let jsonWithoutWhitespace = removeWhiteSpace rawJson
-    putStrLn " ----- JSONWITHOUTWHITESPACE ----- "
-    putStrLn jsonWithoutWhitespace
-    putStrLn ""
-
-    let tokenStream = lexerMakeTokenStream [] jsonWithoutWhitespace
+    let tokenStream = lexerMakeTokenStream [] rawJson
     putStrLn " ----- TOKENSTREAM ----- "
     print tokenStream
     putStrLn ""
@@ -63,17 +58,13 @@ parseJson rawJson = do
     print parseTree
     putStrLn ""
 
-removeWhiteSpace :: [Char] -> String
-removeWhiteSpace string = do
-    let text = pack string
-    unpack (replace (pack "\n") (pack "") (replace (pack "\t") (pack "") (replace (pack " ") (pack "") text)))
-
 
 ----- Lexer Functions -----
 lexerMakeTokenStream :: TokenStream -> String -> TokenStream
 lexerMakeTokenStream tokenStream json
     -- Base case for the recursion, if all the json is tokenified give back the tokenStream.
     | null json                 = tokenStream
+    | isSpace nextChar          = lexerMakeTokenStream tokenStream (tail json)
     -- Simple 1 character tokens.
     | nextChar == leftBrace     = lexerMakeTokenStream (tokenStream ++ [LeftBraceToken]) (tail json)
     | nextChar == rightBrace    = lexerMakeTokenStream (tokenStream ++ [RightBraceToken]) (tail json)
@@ -100,8 +91,7 @@ lexerMakeTextToken token [] = error "Syntax Error: Json not closed properly"
 lexerMakeTextToken token json
     | nextChar == quotation = token
     | otherwise = lexerMakeTextToken (token ++ [nextChar]) (tail json)
-    where
-        nextChar = head json
+    where nextChar = head json
 
 lexerMakeNumberToken :: [Char] -> [Char] -> [Char]
 lexerMakeNumberToken token [] = error "Syntax Error: Json not closed properly"
